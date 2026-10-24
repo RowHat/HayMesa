@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { pedir } from '../api'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
@@ -27,7 +28,7 @@ function horaLocal(minutoUtc: string) {
 }
 
 export default function DetalleLocal() {
-  const id = Number(useParams().id)
+  const id = Number(useParams<{ id: string }>().id)
   const { local, error } = useLocal(id)
   const historial = useHistorial(id)
   const ahora = useAhora()
@@ -35,7 +36,7 @@ export default function DetalleLocal() {
   if (error) {
     return (
       <main className="mx-auto max-w-3xl p-6">
-        <Link to="/" className="text-sm font-medium text-emerald-700">
+        <Link href="/" className="text-sm font-medium text-emerald-700">
           ← Todos los locales
         </Link>
         <p className="mt-4 text-slate-600">{error}</p>
@@ -57,7 +58,7 @@ export default function DetalleLocal() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto max-w-5xl px-4 py-4">
           <div className="flex items-center justify-between">
-            <Link to="/" className="text-sm font-medium text-emerald-700">
+            <Link href="/" className="text-sm font-medium text-emerald-700">
               ← Todos los locales
             </Link>
             <IndicadorEnVivo />

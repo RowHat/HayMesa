@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { CLASE_NIVEL, ETIQUETA_NIVEL, formatearMetros, nivelDe, promoVigente, tiempoRestante } from '../disponibilidad'
 import type { Local } from '../tipos'
 import NumeroAnimado from './NumeroAnimado'
@@ -12,7 +12,7 @@ export default function TarjetaLocal({ local, disponible, personas, distancia, s
 
   return (
     <Link
-      to={`/local/${local.id}`}
+      href={`/local/${local.id}`}
       className={`flex items-center gap-4 rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
         disponible ? (promo ? 'border-pink-300' : 'border-emerald-200') : 'border-slate-200 opacity-60'
       } ${sugerido ? 'ring-4 ring-sky-400/70' : ''}`}

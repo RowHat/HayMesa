@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { pedir } from '../api'
 import SelectorUbicacion from '../componentes/SelectorUbicacion'
 import type { Ubicacion } from '../disponibilidad'
@@ -13,7 +14,7 @@ const TIPOS = ['Restaurante', 'Bar', 'Café', 'Parrilla', 'Pizzería', 'Cervecer
 const claseInput = 'w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none'
 
 export default function Ingresar() {
-  const navegar = useNavigate()
+  const { push: navegar } = useRouter()
   const [modo, setModo] = useState<'login' | 'registro'>('login')
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
@@ -58,7 +59,7 @@ export default function Ingresar() {
   return (
     <main className="min-h-screen bg-emerald-50 px-4 py-10">
       <div className="mx-auto max-w-md rounded-2xl bg-white p-6 shadow">
-        <Link to="/" className="text-sm text-emerald-700">
+        <Link href="/" className="text-sm text-emerald-700">
           ← Volver
         </Link>
         <h1 className="mt-2 text-2xl font-bold text-slate-800">Panel del local</h1>

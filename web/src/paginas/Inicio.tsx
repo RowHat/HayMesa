@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import Asistente from '../componentes/Asistente'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
 import MapaLocales from '../componentes/MapaLocales'
@@ -164,7 +164,7 @@ export default function Inicio() {
 
           <p className="mt-8 text-center text-sm text-slate-500">
             ¿Tenés un local?{' '}
-            <Link to="/dueno" className="font-medium text-emerald-700 underline">
+            <Link href="/dueno" className="font-medium text-emerald-700 underline">
               Sumalo a HayMesa
             </Link>
           </p>

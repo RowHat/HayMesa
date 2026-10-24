@@ -4,7 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { useEffect } from 'react'
 import { CircleMarker, MapContainer, Marker, Popup, useMap } from 'react-leaflet'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { colorMarcador, nivelDe, promoVigente, tiempoRestante, type Ubicacion } from '../disponibilidad'
 import type { Local } from '../tipos'
 
@@ -151,7 +151,7 @@ export default function MapaLocales({ locales: todos, personas, ubicacion, suger
                     🔥 {promo.descripcion} · quedan {tiempoRestante(promo.venceEn, ahora)}
                   </p>
                 )}
-                <Link to={`/local/${local.id}`}>Ver mesas →</Link>
+                <Link href={`/local/${local.id}`}>Ver mesas →</Link>
               </Popup>
             </Marker>
           )

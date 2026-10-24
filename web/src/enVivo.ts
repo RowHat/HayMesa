@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { pedir } from './api'
-import { socket } from './socket'
+import { alActualizarLocal, alCambiarConexion } from './supabaseNavegador'
 import type { Local } from './tipos'
+
+const MS_ENTRE_RECARGAS = 20_000
 
 // Todos los locales, actualizados en vivo con "local_actualizado"
 export function useLocales() {
@@ -29,11 +31,15 @@ export function useLocales() {
     }
 
     cargar()
-    socket.on('local_actualizado', alActualizar)
-    socket.on('connect', cargar) // si se cortó la conexión, recargamos todo al volver
+    // Si se cortó la conexión, recargamos todo al volver. Y cada tanto también, para ver
+    // cámaras que se apagaron o promos que vencieron (de eso no llega ningún aviso)
+    const dejarDeEscuchar = alActualizarLocal(alActualizar)
+    const dejarConexion = alCambiarConexion((ok) => ok && cargar())
+    const intervalo = setInterval(cargar, MS_ENTRE_RECARGAS)
     return () => {
-      socket.off('local_actualizado', alActualizar)
-      socket.off('connect', cargar)
+      dejarDeEscuchar()
+      dejarConexion()
+      clearInterval(intervalo)
     }
   }, [])
 
@@ -57,11 +63,13 @@ export function useLocal(id: number) {
     }
 
     cargar()
-    socket.on('local_actualizado', alActualizar)
-    socket.on('connect', cargar)
+    const dejarDeEscuchar = alActualizarLocal(alActualizar)
+    const dejarConexion = alCambiarConexion((ok) => ok && cargar())
+    const intervalo = setInterval(cargar, MS_ENTRE_RECARGAS)
     return () => {
-      socket.off('local_actualizado', alActualizar)
-      socket.off('connect', cargar)
+      dejarDeEscuchar()
+      dejarConexion()
+      clearInterval(intervalo)
     }
   }, [id])
 
@@ -69,17 +77,8 @@ export function useLocal(id: number) {
 }
 
 export function useConectado() {
-  const [conectado, setConectado] = useState(socket.connected)
-  useEffect(() => {
-    const alConectar = () => setConectado(true)
-    const alDesconectar = () => setConectado(false)
-    socket.on('connect', alConectar)
-    socket.on('disconnect', alDesconectar)
-    return () => {
-      socket.off('connect', alConectar)
-      socket.off('disconnect', alDesconectar)
-    }
-  }, [])
+  const [conectado, setConectado] = useState(false)
+  useEffect(() => alCambiarConexion(setConectado), [])
   return conectado
 }
 

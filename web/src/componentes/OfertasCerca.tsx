@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import { distanciaMetros, formatearMetros, promoVigente, tieneMesaPara, tiempoRestante, type Ubicacion } from '../disponibilidad'
 import type { Local } from '../tipos'
 
@@ -30,7 +30,7 @@ export default function OfertasCerca({ locales, personas, ubicacion, ahora }: Pr
         {ofertas.map(({ local, promo, distancia }) => (
           <li key={local.id} className="w-64 shrink-0 snap-start">
             <Link
-              to={`/local/${local.id}`}
+              href={`/local/${local.id}`}
               className="flex h-full flex-col rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-white p-4 shadow-sm transition hover:shadow-md"
             >
               <p className="text-base leading-snug font-bold text-pink-700">{promo.descripcion}</p>

@@ -1,11 +1,11 @@
 import type { ObjectDetection } from '@tensorflow-models/coco-ssd'
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
 import { ErrorApi, pedir } from '../api'
 import PromoDueno from '../componentes/PromoDueno'
 import { contarPersonasPorMesa, type Caja } from '../deteccion'
 import { borrarToken, leerToken } from '../sesion'
-import { socket } from '../socket'
+import { alActualizarLocal, alCambiarConexion } from '../supabaseNavegador'
 import type { Local, Zona } from '../tipos'
 
 // Mesa mientras el dueño la edita. "id" existe solo si ya está guardada en el server.
@@ -42,7 +42,7 @@ function Indicador({ ok, texto }: { ok: boolean; texto: string }) {
 }
 
 export default function Panel() {
-  const navegar = useNavigate()
+  const { push: navegar } = useRouter()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -54,7 +54,7 @@ export default function Panel() {
   const [modelo, setModelo] = useState<ObjectDetection | null>(null)
   const [estados, setEstados] = useState(new Map<number, EstadoDetectado>())
   const [personasEnImagen, setPersonasEnImagen] = useState(0)
-  const [conectado, setConectado] = useState(socket.connected)
+  const [conectado, setConectado] = useState(false)
   const [error, setError] = useState('')
 
   // Los loops de detección y dibujo leen estos refs para tener siempre el valor actual
@@ -192,9 +192,10 @@ export default function Panel() {
   // Envío al server: solo el estado de cada mesa, nunca la imagen
   useEffect(() => {
     const intervalo = setInterval(() => {
-      const token = leerToken()
       const mesasEstado = [...estadosRef.current].map(([mesaId, e]) => ({ mesaId, ocupada: e.ocupada, personas: e.personas }))
-      if (token && mesasEstado.length > 0) socket.emit('estado', { token, mesas: mesasEstado })
+      if (leerToken() && mesasEstado.length > 0) {
+        pedir('/mi-local/estado', 'POST', { mesas: mesasEstado }).catch((err: Error) => setError(err.message))
+      }
     }, MS_ENTRE_ENVIOS)
     return () => clearInterval(intervalo)
   }, [])
@@ -202,25 +203,12 @@ export default function Panel() {
   // El local también se actualiza en vivo (mesas libres, promo que vence o se agota)
   useEffect(() => {
     const alActualizar = (actualizado: Local) => setLocal((actual) => (actual && actual.id === actualizado.id ? actualizado : actual))
-    socket.on('local_actualizado', alActualizar)
-    return () => {
-      socket.off('local_actualizado', alActualizar)
-    }
+    return alActualizarLocal(alActualizar)
   }, [])
 
   // Conexión con el server
   useEffect(() => {
-    const alConectar = () => setConectado(true)
-    const alDesconectar = () => setConectado(false)
-    const alError = (datos: { error: string }) => setError(datos.error)
-    socket.on('connect', alConectar)
-    socket.on('disconnect', alDesconectar)
-    socket.on('error_estado', alError)
-    return () => {
-      socket.off('connect', alConectar)
-      socket.off('disconnect', alDesconectar)
-      socket.off('error_estado', alError)
-    }
+    return alCambiarConexion(setConectado)
   }, [])
 
   // Dibujo de zonas y personas sobre la imagen
