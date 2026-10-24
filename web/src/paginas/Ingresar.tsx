@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { pedir } from '../api'
+import SelectorUbicacion from '../componentes/SelectorUbicacion'
+import type { Ubicacion } from '../disponibilidad'
 import { guardarToken } from '../sesion'
 import type { Local } from '../tipos'
 
@@ -21,22 +23,15 @@ export default function Ingresar() {
   const [nombre, setNombre] = useState('')
   const [tipo, setTipo] = useState(TIPOS[0])
   const [direccion, setDireccion] = useState('')
-  const [lat, setLat] = useState('')
-  const [lng, setLng] = useState('')
-
-  function usarMiUbicacion() {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLat(pos.coords.latitude.toFixed(6))
-        setLng(pos.coords.longitude.toFixed(6))
-      },
-      () => setError('No pudimos obtener tu ubicación, cargala a mano'),
-    )
-  }
+  const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null)
 
   async function enviar(e: FormEvent) {
     e.preventDefault()
     setError('')
+    if (modo === 'registro' && !ubicacion) {
+      setError('Marcá en el mapa dónde está tu local')
+      return
+    }
     setEnviando(true)
     try {
       const respuesta =
@@ -46,8 +41,8 @@ export default function Ingresar() {
               nombre,
               tipo,
               direccion,
-              lat: Number(lat),
-              lng: Number(lng),
+              lat: ubicacion!.lat,
+              lng: ubicacion!.lng,
               email,
               password,
             })
@@ -90,14 +85,15 @@ export default function Ingresar() {
                   <option key={t}>{t}</option>
                 ))}
               </select>
-              <input className={claseInput} placeholder="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} required />
-              <div className="flex gap-2">
-                <input className={claseInput} placeholder="Latitud" type="number" step="any" value={lat} onChange={(e) => setLat(e.target.value)} required />
-                <input className={claseInput} placeholder="Longitud" type="number" step="any" value={lng} onChange={(e) => setLng(e.target.value)} required />
-              </div>
-              <button type="button" onClick={usarMiUbicacion} className="text-sm text-emerald-700 underline">
-                Usar mi ubicación actual
-              </button>
+              <SelectorUbicacion
+                direccion={direccion}
+                alCambiarDireccion={setDireccion}
+                ubicacion={ubicacion}
+                alCambiarUbicacion={(u) => {
+                  setUbicacion(u)
+                  setError('')
+                }}
+              />
             </>
           )}
 

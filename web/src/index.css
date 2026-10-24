@@ -60,3 +60,15 @@
     box-shadow: 0 0 0 18px rgb(219 39 119 / 0);
   }
 }
+
+/* Pin arrastrable del registro (la punta marca el lugar exacto) */
+.pin-registro {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  background: #059669;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 0.4);
+  transform: rotate(-45deg);
+  cursor: grab;
+}
