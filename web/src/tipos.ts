@@ -22,7 +22,11 @@ export type Local = {
   enVivo: boolean
   mesasLibres: number
   mesas: Mesa[]
+  promo: Promo | null
 }
+
+// Promo de último momento ("venceEn" en ISO; "mesasConPromo" = cupo que queda)
+export type Promo = { descripcion: string; venceEn: string; mesasConPromo: number }
 
 // Un punto por minuto mientras la cámara del local estuvo en vivo ("minuto" en UTC)
 export type PuntoHistorial = { minuto: string; ocupadas: number; total: number }

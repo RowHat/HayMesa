@@ -1,4 +1,5 @@
 import { db } from './db.js'
+import { promoActiva, registrarMesasTomadas, terminarPromo } from './promos.js'
 
 // Zona de la mesa sobre la imagen, en proporciones de 0 a 1
 export type Zona = { x: number; y: number; ancho: number; alto: number }
@@ -22,7 +23,11 @@ export type Local = {
   enVivo: boolean
   mesasLibres: number
   mesas: Mesa[]
+  promo: Promo | null
 }
+
+// Lo que ve el público de una promo activa
+export type Promo = { descripcion: string; venceEn: string; mesasConPromo: number }
 
 // Si la cámara no mandó datos en este tiempo, consideramos el local desconectado
 const SEGUNDOS_EN_VIVO = 60
@@ -64,6 +69,12 @@ function armarLocal(fila: FilaRestaurante): Local {
     fila.ultima_actualizacion !== null &&
     Date.now() - new Date(fila.ultima_actualizacion).getTime() < SEGUNDOS_EN_VIVO * 1000
 
+  const mesasLibres = mesas.filter((m) => !m.ocupada).length
+
+  // Solo mostramos la promo si la cámara confirma que hay mesas libres
+  const promo = enVivo ? promoActiva(fila.id) : null
+  const mesasConPromo = promo ? Math.min(promo.cupo - promo.mesasTomadas, mesasLibres) : 0
+
   return {
     id: fila.id,
     nombre: fila.nombre,
@@ -72,8 +83,9 @@ function armarLocal(fila: FilaRestaurante): Local {
     lat: fila.lat,
     lng: fila.lng,
     enVivo,
-    mesasLibres: mesas.filter((m) => !m.ocupada).length,
+    mesasLibres,
     mesas,
+    promo: promo && mesasConPromo > 0 ? { descripcion: promo.descripcion, venceEn: promo.venceEn, mesasConPromo } : null,
   }
 }
 
@@ -108,11 +120,22 @@ export type EstadoMesa = { mesaId: number; ocupada: boolean; personas: number }
 
 // Guarda lo que detectó la cámara. Solo toca mesas que sean de ese local.
 export const guardarEstado = db.transaction((restauranteId: number, estados: EstadoMesa[]) => {
+  const leerAnterior = db.prepare('SELECT ocupada FROM mesas WHERE id = ? AND restaurante_id = ?')
   const actualizar = db.prepare('UPDATE mesas SET ocupada = ?, personas = ? WHERE id = ? AND restaurante_id = ?')
+  let mesasQueSeOcuparon = 0
   for (const estado of estados) {
+    const anterior = leerAnterior.get(estado.mesaId, restauranteId) as { ocupada: number } | undefined
+    if (anterior && anterior.ocupada === 0 && estado.ocupada) mesasQueSeOcuparon++
     actualizar.run(estado.ocupada ? 1 : 0, estado.personas, estado.mesaId, restauranteId)
   }
   db.prepare('UPDATE restaurantes SET ultima_actualizacion = ? WHERE id = ?').run(new Date().toISOString(), restauranteId)
+
+  // La promo descuenta cupo con cada mesa que se ocupa, y termina si el local se llena
+  if (mesasQueSeOcuparon > 0) registrarMesasTomadas(restauranteId, mesasQueSeOcuparon)
+  const { libres } = db
+    .prepare('SELECT COUNT(*) AS libres FROM mesas WHERE restaurante_id = ? AND ocupada = 0')
+    .get(restauranteId) as { libres: number }
+  if (libres === 0) terminarPromo(restauranteId, 'lleno')
 })
 
 // Snapshot de ocupación de cada local en vivo, una fila por minuto (para la predicción)

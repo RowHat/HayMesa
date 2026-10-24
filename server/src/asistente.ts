@@ -30,6 +30,10 @@ function distanciaMetros(a: Ubicacion, b: Ubicacion): number {
   return 2 * 6371000 * Math.asin(Math.sqrt(h))
 }
 
+function minutosHasta(fechaIso: string) {
+  return Math.max(0, Math.round((new Date(fechaIso).getTime() - Date.now()) / 60_000))
+}
+
 // ---------- Herramientas ----------
 
 export function buscarLocales(personas: number, tipo: string | undefined, ubicacion: Ubicacion | null) {
@@ -45,6 +49,7 @@ export function buscarLocales(personas: number, tipo: string | undefined, ubicac
       mesasTotales: l.mesas.length,
       mesasLibresQueAlcanzan: l.mesas.filter((m) => !m.ocupada && m.capacidad >= personas).length,
       distanciaMetros: ubicacion ? Math.round(distanciaMetros(ubicacion, l)) : null,
+      promo: l.promo ? { descripcion: l.promo.descripcion, minutosRestantes: minutosHasta(l.promo.venceEn) } : null,
     }))
     .filter((l) => l.mesasLibresQueAlcanzan > 0)
     .sort((a, b) => (a.distanciaMetros ?? 0) - (b.distanciaMetros ?? 0) || b.mesasLibresQueAlcanzan - a.mesasLibresQueAlcanzan)
@@ -60,6 +65,7 @@ function detalleLocal(id: number) {
     direccion: local.direccion,
     camaraEnVivo: local.enVivo,
     mesas: local.mesas.map((m) => ({ nombre: m.nombre, capacidad: m.capacidad, ocupada: m.ocupada })),
+    promo: local.promo ? { descripcion: local.promo.descripcion, minutosRestantes: minutosHasta(local.promo.venceEn) } : null,
     prediccion: predecir(local.id),
   }
 }
@@ -133,6 +139,7 @@ Reglas:
 - Si no hay lugar, decilo. Si la predicción de detalle_local dice a qué hora suele liberarse, contalo.
 - Respondé corto (máximo 3 oraciones), en español rioplatense, con voseo y tono amable. Texto plano, sin markdown ni asteriscos.
 - Nombrá los locales con su nombre exacto. Si tenés la distancia, mencionala.
+- Si un local tiene promo activa, contala con los minutos que le quedan.
 - ${ubicacion ? 'El usuario compartió su ubicación: buscar_locales devuelve la distancia en metros.' : 'El usuario no compartió su ubicación, así que no sabés qué tan cerca está.'}`
 }
 

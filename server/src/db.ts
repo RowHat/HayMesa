@@ -33,6 +33,17 @@ db.exec(`
     total INTEGER NOT NULL,
     PRIMARY KEY (restaurante_id, minuto)
   );
+
+  -- "terminada" queda en NULL mientras la promo está activa; si no: 'vencio', 'cupo', 'lleno' o 'manual'
+  CREATE TABLE IF NOT EXISTS promos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    restaurante_id INTEGER NOT NULL REFERENCES restaurantes(id) ON DELETE CASCADE,
+    descripcion TEXT NOT NULL,
+    vence_en TEXT NOT NULL,
+    cupo INTEGER NOT NULL,
+    mesas_tomadas INTEGER NOT NULL DEFAULT 0,
+    terminada TEXT
+  );
 `)
 
 // Para bases creadas antes de que existiera una columna

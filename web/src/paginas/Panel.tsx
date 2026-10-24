@@ -2,6 +2,7 @@ import type { ObjectDetection } from '@tensorflow-models/coco-ssd'
 import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ErrorApi, pedir } from '../api'
+import PromoDueno from '../componentes/PromoDueno'
 import { contarPersonasPorMesa, type Caja } from '../deteccion'
 import { borrarToken, leerToken } from '../sesion'
 import { socket } from '../socket'
@@ -196,6 +197,15 @@ export default function Panel() {
       if (token && mesasEstado.length > 0) socket.emit('estado', { token, mesas: mesasEstado })
     }, MS_ENTRE_ENVIOS)
     return () => clearInterval(intervalo)
+  }, [])
+
+  // El local también se actualiza en vivo (mesas libres, promo que vence o se agota)
+  useEffect(() => {
+    const alActualizar = (actualizado: Local) => setLocal((actual) => (actual && actual.id === actualizado.id ? actualizado : actual))
+    socket.on('local_actualizado', alActualizar)
+    return () => {
+      socket.off('local_actualizado', alActualizar)
+    }
   }, [])
 
   // Conexión con el server
@@ -434,6 +444,8 @@ export default function Panel() {
           {local && local.mesas.length > 0 && (
             <p className="text-xs text-emerald-300">Enviando el estado en vivo cada 2 segundos.</p>
           )}
+
+          {local && <PromoDueno local={local} alCambiar={setLocal} alError={setError} />}
         </aside>
       </div>
     </main>

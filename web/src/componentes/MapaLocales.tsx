@@ -1,8 +1,9 @@
+import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useEffect } from 'react'
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
 import { Link } from 'react-router-dom'
-import { colorMarcador, type Ubicacion } from '../disponibilidad'
+import { colorMarcador, promoVigente, tiempoRestante, type Ubicacion } from '../disponibilidad'
 import type { Local } from '../tipos'
 
 const CENTRO_INICIAL: [number, number] = [-32.9476, -60.6305] // Rosario
@@ -22,9 +23,31 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
   return null
 }
 
-type Props = { locales: Local[]; personas: number; ubicacion: Ubicacion | null; sugeridos: number[]; className?: string }
+// Círculo con la cantidad de mesas libres; los locales con promo laten y llevan un "%"
+function icono(local: Local, personas: number, sugerido: boolean, conPromo: boolean) {
+  const clases = ['marcador', sugerido ? 'marcador-sugerido' : '', conPromo ? 'marcador-promo' : ''].join(' ')
+  const texto = local.enVivo ? String(local.mesasLibres) : '–'
+  return divIcon({
+    className: '',
+    html: `<div class="${clases}" style="background:${colorMarcador(local, personas)}">${texto}${
+      conPromo ? '<span class="marcador-etiqueta">%</span>' : ''
+    }</div>`,
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
+    popupAnchor: [0, -18],
+  })
+}
 
-export default function MapaLocales({ locales, personas, ubicacion, sugeridos, className = '' }: Props) {
+type Props = {
+  locales: Local[]
+  personas: number
+  ubicacion: Ubicacion | null
+  sugeridos: number[]
+  ahora: number
+  className?: string
+}
+
+export default function MapaLocales({ locales, personas, ubicacion, sugeridos, ahora, className = '' }: Props) {
   const puntos: [number, number][] = locales.map((l) => [l.lat, l.lng])
   if (ubicacion) puntos.push([ubicacion.lat, ubicacion.lng])
 
@@ -46,27 +69,29 @@ export default function MapaLocales({ locales, personas, ubicacion, sugeridos, c
         </CircleMarker>
       )}
 
-      {locales.map((local) => (
-        <CircleMarker
-          key={local.id}
-          center={[local.lat, local.lng]}
-          radius={sugeridos.includes(local.id) ? 18 : 13}
-          pathOptions={{
-            color: sugeridos.includes(local.id) ? '#0284c7' : '#ffffff',
-            weight: sugeridos.includes(local.id) ? 5 : 3,
-            fillColor: colorMarcador(local, personas),
-            fillOpacity: 0.95,
-          }}
-        >
-          <Popup>
-            <p className="font-semibold">{local.nombre}</p>
-            <p>
-              {local.enVivo ? `${local.mesasLibres} de ${local.mesas.length} mesas libres` : 'Sin datos ahora'}
-            </p>
-            <Link to={`/local/${local.id}`}>Ver mesas →</Link>
-          </Popup>
-        </CircleMarker>
-      ))}
+      {locales.map((local) => {
+        const promo = promoVigente(local, ahora)
+        return (
+          <Marker
+            key={local.id}
+            position={[local.lat, local.lng]}
+            icon={icono(local, personas, sugeridos.includes(local.id), promo !== null)}
+            // Los que tienen más mesas libres quedan dibujados arriba
+            zIndexOffset={local.enVivo ? local.mesasLibres * 100 : -1000}
+          >
+            <Popup>
+              <p className="font-semibold">{local.nombre}</p>
+              <p>{local.enVivo ? `${local.mesasLibres} de ${local.mesas.length} mesas libres` : 'Sin datos ahora'}</p>
+              {promo && (
+                <p className="font-semibold text-pink-700">
+                  🔥 {promo.descripcion} · quedan {tiempoRestante(promo.venceEn, ahora)}
+                </p>
+              )}
+              <Link to={`/local/${local.id}`}>Ver mesas →</Link>
+            </Popup>
+          </Marker>
+        )
+      })}
     </MapContainer>
   )
 }

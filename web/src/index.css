@@ -13,3 +13,50 @@
     }
   }
 }
+
+/* Marcadores del mapa: círculo con la cantidad de mesas libres */
+.marcador {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 3px solid #fff;
+  border-radius: 9999px;
+  color: #fff;
+  font: 700 15px/1 system-ui, sans-serif;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.marcador-sugerido {
+  box-shadow: 0 0 0 4px #0284c7, 0 1px 4px rgb(0 0 0 / 0.35);
+}
+
+.marcador-promo {
+  animation: latido-promo 1.6s ease-out infinite;
+}
+
+.marcador-etiqueta {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  background: #db2777;
+  font-size: 12px;
+}
+
+@keyframes latido-promo {
+  0% {
+    box-shadow: 0 0 0 0 rgb(219 39 119 / 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 18px rgb(219 39 119 / 0);
+  }
+}

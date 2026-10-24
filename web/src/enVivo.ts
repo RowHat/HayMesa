@@ -82,3 +82,13 @@ export function useConectado() {
   }, [])
   return conectado
 }
+
+// Hora actual que se actualiza sola (para las cuentas regresivas de las promos)
+export function useAhora(cadaMs = 1000) {
+  const [ahora, setAhora] = useState(() => Date.now())
+  useEffect(() => {
+    const intervalo = setInterval(() => setAhora(Date.now()), cadaMs)
+    return () => clearInterval(intervalo)
+  }, [cadaMs])
+  return ahora
+}

@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { requiereAuth } from '../auth.js'
 import { guardarMesas, listarLocales, obtenerHistorial, obtenerLocal, type MesaNueva } from '../locales.js'
 import { predecir } from '../prediccion.js'
+import { activarPromo, terminarPromo } from '../promos.js'
 import { avisarLocalActualizado } from '../tiempoReal.js'
 
 export const rutasLocales = Router()
@@ -59,6 +60,40 @@ rutasLocales.put('/mi-local/mesas', requiereAuth, (req, res) => {
   }
 
   guardarMesas(res.locals.restauranteId, mesas as MesaNueva[])
+  avisarLocalActualizado(res.locals.restauranteId)
+  res.json(obtenerLocal(res.locals.restauranteId))
+})
+
+// Dueño: activa una promo de último momento para sus mesas libres
+rutasLocales.post('/mi-local/promo', requiereAuth, (req, res) => {
+  const { descripcion, minutos, cupo } = req.body ?? {}
+  const local = obtenerLocal(res.locals.restauranteId)!
+
+  if (typeof descripcion !== 'string' || descripcion.trim().length < 3 || descripcion.length > 80) {
+    res.status(400).json({ error: 'Escribí la promo (entre 3 y 80 caracteres)' })
+    return
+  }
+  if (!Number.isInteger(minutos) || minutos < 5 || minutos > 180) {
+    res.status(400).json({ error: 'La vigencia tiene que ser de 5 a 180 minutos' })
+    return
+  }
+  if (!local.enVivo || local.mesasLibres === 0) {
+    res.status(409).json({ error: 'Para activar una promo necesitás la cámara en vivo y al menos una mesa libre' })
+    return
+  }
+  if (!Number.isInteger(cupo) || cupo < 1 || cupo > local.mesasLibres) {
+    res.status(400).json({ error: `El cupo tiene que ser de 1 a ${local.mesasLibres} mesas (las que tenés libres)` })
+    return
+  }
+
+  activarPromo(local.id, descripcion.trim(), minutos, cupo)
+  avisarLocalActualizado(local.id)
+  res.json(obtenerLocal(local.id))
+})
+
+// Dueño: termina la promo antes de tiempo
+rutasLocales.delete('/mi-local/promo', requiereAuth, (_req, res) => {
+  terminarPromo(res.locals.restauranteId, 'manual')
   avisarLocalActualizado(res.locals.restauranteId)
   res.json(obtenerLocal(res.locals.restauranteId))
 })

@@ -5,8 +5,8 @@ import { pedir } from '../api'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
 import NumeroAnimado from '../componentes/NumeroAnimado'
 import PrediccionLocal from '../componentes/PrediccionLocal'
-import { CLASE_NIVEL, ETIQUETA_NIVEL, nivelDe } from '../disponibilidad'
-import { useLocal } from '../enVivo'
+import { CLASE_NIVEL, ETIQUETA_NIVEL, nivelDe, promoVigente, tiempoRestante } from '../disponibilidad'
+import { useAhora, useLocal } from '../enVivo'
 import type { PuntoHistorial } from '../tipos'
 
 const HORAS_HISTORIAL = 3
@@ -30,6 +30,7 @@ export default function DetalleLocal() {
   const id = Number(useParams().id)
   const { local, error } = useLocal(id)
   const historial = useHistorial(id)
+  const ahora = useAhora()
 
   if (error) {
     return (
@@ -45,6 +46,7 @@ export default function DetalleLocal() {
 
   const nivel = nivelDe(local)
   const sinDatos = nivel === 'sin-datos'
+  const promo = promoVigente(local, ahora)
   const datosGrafico = historial.map((p) => ({
     hora: horaLocal(p.minuto),
     ocupacion: Math.round((p.ocupadas / p.total) * 100),
@@ -83,6 +85,22 @@ export default function DetalleLocal() {
       </header>
 
       <main className="mx-auto max-w-5xl space-y-8 px-4 py-6">
+        {promo && (
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border-2 border-pink-300 bg-gradient-to-br from-pink-50 to-white p-4">
+            <div>
+              <p className="text-xs font-semibold tracking-wide text-pink-600 uppercase">🔥 Promo de último momento</p>
+              <p className="text-xl font-bold text-pink-700">{promo.descripcion}</p>
+              <p className="text-sm text-slate-600">
+                {promo.mesasConPromo} {promo.mesasConPromo === 1 ? 'mesa' : 'mesas'} con promo
+              </p>
+            </div>
+            <p className="text-right">
+              <span className="block text-xs text-slate-500">Quedan</span>
+              <span className="text-3xl font-bold text-slate-900 tabular-nums">{tiempoRestante(promo.venceEn, ahora)}</span>
+            </p>
+          </section>
+        )}
+
         <section>
           <h2 className="mb-3 text-lg font-semibold text-slate-900">Mesas</h2>
           {local.mesas.length === 0 && <p className="text-slate-500">Este local todavía no cargó sus mesas.</p>}

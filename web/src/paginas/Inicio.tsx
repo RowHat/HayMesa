@@ -3,14 +3,16 @@ import { Link } from 'react-router-dom'
 import Asistente from '../componentes/Asistente'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
 import MapaLocales from '../componentes/MapaLocales'
+import OfertasCerca from '../componentes/OfertasCerca'
 import TarjetaLocal from '../componentes/TarjetaLocal'
-import { distanciaMetros, tieneMesaPara, type Ubicacion } from '../disponibilidad'
-import { useLocales } from '../enVivo'
+import { distanciaMetros, mesasQueAlcanzan, type Ubicacion } from '../disponibilidad'
+import { useAhora, useLocales } from '../enVivo'
 
 const OPCIONES_PERSONAS = [1, 2, 3, 4, 5, 6, 7, 8]
 
 export default function Inicio() {
   const { locales, cargando, error } = useLocales()
+  const ahora = useAhora()
   const [personas, setPersonas] = useState(2)
   const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null)
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
@@ -34,17 +36,29 @@ export default function Inicio() {
     )
   }
 
-  // Primero los sugeridos por el asistente, después los que tienen lugar para el grupo,
+  // Orden: sugeridos por el asistente, después los que tienen lugar para el grupo (primero los que
+  // tienen más mesas libres donde entra, para favorecer a los locales vacíos; a igual lugar, el más cercano),
   // después los llenos y al final los sin datos
   const filas = locales
-    .map((local) => ({
-      local,
-      disponible: tieneMesaPara(local, personas),
-      distancia: ubicacion ? distanciaMetros(ubicacion, local) : null,
-      grupo: tieneMesaPara(local, personas) ? 0 : local.enVivo ? 1 : 2,
-      sugerido: sugeridos.includes(local.id),
-    }))
-    .sort((a, b) => Number(b.sugerido) - Number(a.sugerido) || a.grupo - b.grupo || (a.distancia ?? 0) - (b.distancia ?? 0) || a.local.nombre.localeCompare(b.local.nombre))
+    .map((local) => {
+      const libresParaElGrupo = mesasQueAlcanzan(local, personas)
+      return {
+        local,
+        libresParaElGrupo,
+        disponible: libresParaElGrupo > 0,
+        distancia: ubicacion ? distanciaMetros(ubicacion, local) : null,
+        grupo: libresParaElGrupo > 0 ? 0 : local.enVivo ? 1 : 2,
+        sugerido: sugeridos.includes(local.id),
+      }
+    })
+    .sort(
+      (a, b) =>
+        Number(b.sugerido) - Number(a.sugerido) ||
+        a.grupo - b.grupo ||
+        b.libresParaElGrupo - a.libresParaElGrupo ||
+        (a.distancia ?? 0) - (b.distancia ?? 0) ||
+        a.local.nombre.localeCompare(b.local.nombre),
+    )
 
   const cantidadDisponibles = filas.filter((f) => f.disponible).length
 
@@ -79,13 +93,14 @@ export default function Inicio() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-4 px-4 pt-4 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <main className="mx-auto grid max-w-7xl grid-cols-1 gap-4 px-4 pt-4 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="lg:sticky lg:top-32 lg:order-2 lg:self-start">
           <MapaLocales
             locales={locales}
             personas={personas}
             ubicacion={ubicacion}
             sugeridos={sugeridos}
+            ahora={ahora}
             className="h-60 w-full overflow-hidden rounded-2xl shadow-sm sm:h-80 lg:h-[calc(100vh-10rem)]"
           />
         </section>
@@ -102,7 +117,7 @@ export default function Inicio() {
               disabled={buscandoUbicacion}
               className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50"
             >
-              {buscandoUbicacion ? 'Buscando…' : ubicacion ? '📍 Ordenado por distancia' : '📍 Usar mi ubicación'}
+              {buscandoUbicacion ? 'Buscando…' : ubicacion ? '📍 Ubicación activada' : '📍 Usar mi ubicación'}
             </button>
           </div>
           {errorUbicacion && <p className="mb-3 text-sm text-red-600">{errorUbicacion}</p>}
@@ -120,6 +135,14 @@ export default function Inicio() {
             </p>
           )}
 
+          <OfertasCerca locales={locales} personas={personas} ubicacion={ubicacion} ahora={ahora} />
+
+          {locales.length > 0 && (
+            <p className="mb-2 text-xs text-slate-500">
+              Primero los que tienen más mesas libres para tu grupo{ubicacion ? '; a igual lugar, el más cercano' : ''}.
+            </p>
+          )}
+
           {error && <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">No pudimos cargar los locales: {error}</p>}
           {cargando && <p className="p-4 text-slate-500">Cargando locales…</p>}
           {!cargando && !error && locales.length === 0 && <p className="p-4 text-slate-500">Todavía no hay locales.</p>}
@@ -133,6 +156,7 @@ export default function Inicio() {
                   personas={personas}
                   distancia={f.distancia}
                   sugerido={f.sugerido}
+                  ahora={ahora}
                 />
               </li>
             ))}
