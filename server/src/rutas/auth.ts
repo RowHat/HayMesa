@@ -7,7 +7,7 @@ import { obtenerLocal } from '../locales.js'
 export const rutasAuth = Router()
 
 rutasAuth.post('/registro', async (req, res) => {
-  const { nombre, direccion, lat, lng, email, password } = req.body ?? {}
+  const { nombre, tipo, direccion, lat, lng, email, password } = req.body ?? {}
 
   if (!nombre || !direccion || !email || !password) {
     res.status(400).json({ error: 'Completá nombre, dirección, email y contraseña' })
@@ -30,8 +30,8 @@ rutasAuth.post('/registro', async (req, res) => {
 
   const passwordHash = await bcrypt.hash(String(password), 10)
   const resultado = db
-    .prepare('INSERT INTO restaurantes (nombre, direccion, lat, lng, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)')
-    .run(nombre, direccion, lat, lng, email, passwordHash)
+    .prepare('INSERT INTO restaurantes (nombre, tipo, direccion, lat, lng, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(nombre, tipo || 'Restaurante', direccion, lat, lng, email, passwordHash)
 
   const id = Number(resultado.lastInsertRowid)
   res.status(201).json({ token: crearToken(id), local: obtenerLocal(id) })

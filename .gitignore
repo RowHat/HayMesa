@@ -1,5 +1,5 @@
 node_modules
 .env
-data/*.db
-data/*.db-*
+server/data/*.db
+server/data/*.db-*
 dist

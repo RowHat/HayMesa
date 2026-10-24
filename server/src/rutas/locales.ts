@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { requiereAuth } from '../auth.js'
-import { guardarMesas, listarLocales, obtenerLocal, type MesaNueva } from '../locales.js'
+import { guardarMesas, listarLocales, obtenerHistorial, obtenerLocal, type MesaNueva } from '../locales.js'
 import { avisarLocalActualizado } from '../tiempoReal.js'
 
 export const rutasLocales = Router()
@@ -8,6 +8,22 @@ export const rutasLocales = Router()
 // Público: todos los locales con sus mesas
 rutasLocales.get('/locales', (_req, res) => {
   res.json(listarLocales())
+})
+
+// Público: un local
+rutasLocales.get('/locales/:id', (req, res) => {
+  const local = obtenerLocal(Number(req.params.id))
+  if (!local) {
+    res.status(404).json({ error: 'No existe ese local' })
+    return
+  }
+  res.json(local)
+})
+
+// Público: ocupación de las últimas horas (por defecto 3, máximo 24)
+rutasLocales.get('/locales/:id/historial', (req, res) => {
+  const horas = Math.min(24, Math.max(1, Number(req.query.horas) || 3))
+  res.json(obtenerHistorial(Number(req.params.id), horas))
 })
 
 // Dueño: su propio local

@@ -35,8 +35,13 @@ db.exec(`
   );
 `)
 
-// Bases creadas antes de agregar la columna "personas"
-const columnasMesas = db.prepare('PRAGMA table_info(mesas)').all() as { name: string }[]
-if (!columnasMesas.some((c) => c.name === 'personas')) {
-  db.exec('ALTER TABLE mesas ADD COLUMN personas INTEGER NOT NULL DEFAULT 0')
+// Para bases creadas antes de que existiera una columna
+function agregarColumnaSiFalta(tabla: string, columna: string, definicion: string) {
+  const columnas = db.prepare(`PRAGMA table_info(${tabla})`).all() as { name: string }[]
+  if (!columnas.some((c) => c.name === columna)) {
+    db.exec(`ALTER TABLE ${tabla} ADD COLUMN ${columna} ${definicion}`)
+  }
 }
+
+agregarColumnaSiFalta('mesas', 'personas', 'INTEGER NOT NULL DEFAULT 0')
+agregarColumnaSiFalta('restaurantes', 'tipo', "TEXT NOT NULL DEFAULT 'Restaurante'")

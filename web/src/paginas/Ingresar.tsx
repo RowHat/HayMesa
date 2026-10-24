@@ -6,6 +6,8 @@ import type { Local } from '../tipos'
 
 type RespuestaSesion = { token: string; local: Local }
 
+const TIPOS = ['Restaurante', 'Bar', 'Café', 'Parrilla', 'Pizzería', 'Cervecería']
+
 const claseInput = 'w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-emerald-500 focus:outline-none'
 
 export default function Ingresar() {
@@ -17,6 +19,7 @@ export default function Ingresar() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [nombre, setNombre] = useState('')
+  const [tipo, setTipo] = useState(TIPOS[0])
   const [direccion, setDireccion] = useState('')
   const [lat, setLat] = useState('')
   const [lng, setLng] = useState('')
@@ -41,6 +44,7 @@ export default function Ingresar() {
           ? await pedir<RespuestaSesion>('/login', 'POST', { email, password })
           : await pedir<RespuestaSesion>('/registro', 'POST', {
               nombre,
+              tipo,
               direccion,
               lat: Number(lat),
               lng: Number(lng),
@@ -81,6 +85,11 @@ export default function Ingresar() {
           {modo === 'registro' && (
             <>
               <input className={claseInput} placeholder="Nombre del local" value={nombre} onChange={(e) => setNombre(e.target.value)} required />
+              <select className={claseInput} value={tipo} onChange={(e) => setTipo(e.target.value)}>
+                {TIPOS.map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </select>
               <input className={claseInput} placeholder="Dirección" value={direccion} onChange={(e) => setDireccion(e.target.value)} required />
               <div className="flex gap-2">
                 <input className={claseInput} placeholder="Latitud" type="number" step="any" value={lat} onChange={(e) => setLat(e.target.value)} required />

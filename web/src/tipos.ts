@@ -15,6 +15,7 @@ export type Mesa = {
 export type Local = {
   id: number
   nombre: string
+  tipo: string
   direccion: string
   lat: number
   lng: number
@@ -22,3 +23,6 @@ export type Local = {
   mesasLibres: number
   mesas: Mesa[]
 }
+
+// Un punto por minuto mientras la cámara del local estuvo en vivo ("minuto" en UTC)
+export type PuntoHistorial = { minuto: string; ocupadas: number; total: number }

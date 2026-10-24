@@ -1,6 +1,6 @@
 import type { Server } from 'socket.io'
 import { leerToken } from './auth.js'
-import { guardarEstado, obtenerLocal, type EstadoMesa } from './locales.js'
+import { guardarEstado, listarLocales, obtenerLocal, type EstadoMesa } from './locales.js'
 
 let io: Server | null = null
 
@@ -36,4 +36,15 @@ export function iniciarTiempoReal(servidorIo: Server) {
       avisarLocalActualizado(restauranteId)
     })
   })
+
+  // Si una cámara deja de mandar datos no llega ningún evento, así que revisamos
+  // cada tanto qué locales pasaron de en vivo a sin datos (o al revés) y avisamos
+  const estabaEnVivo = new Map<number, boolean>()
+  setInterval(() => {
+    for (const local of listarLocales()) {
+      const antes = estabaEnVivo.get(local.id)
+      estabaEnVivo.set(local.id, local.enVivo)
+      if (antes !== undefined && antes !== local.enVivo) io?.emit('local_actualizado', local)
+    }
+  }, 10_000)
 }

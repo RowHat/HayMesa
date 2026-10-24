@@ -15,6 +15,7 @@ export type Mesa = {
 export type Local = {
   id: number
   nombre: string
+  tipo: string
   direccion: string
   lat: number
   lng: number
@@ -29,6 +30,7 @@ const SEGUNDOS_EN_VIVO = 60
 type FilaRestaurante = {
   id: number
   nombre: string
+  tipo: string
   direccion: string
   lat: number
   lng: number
@@ -65,6 +67,7 @@ function armarLocal(fila: FilaRestaurante): Local {
   return {
     id: fila.id,
     nombre: fila.nombre,
+    tipo: fila.tipo,
     direccion: fila.direccion,
     lat: fila.lat,
     lng: fila.lng,
@@ -74,16 +77,18 @@ function armarLocal(fila: FilaRestaurante): Local {
   }
 }
 
+const COLUMNAS_RESTAURANTE = 'id, nombre, tipo, direccion, lat, lng, ultima_actualizacion'
+
 export function listarLocales(): Local[] {
   const filas = db
-    .prepare('SELECT id, nombre, direccion, lat, lng, ultima_actualizacion FROM restaurantes ORDER BY nombre')
+    .prepare(`SELECT ${COLUMNAS_RESTAURANTE} FROM restaurantes ORDER BY nombre`)
     .all() as FilaRestaurante[]
   return filas.map(armarLocal)
 }
 
 export function obtenerLocal(id: number): Local | null {
   const fila = db
-    .prepare('SELECT id, nombre, direccion, lat, lng, ultima_actualizacion FROM restaurantes WHERE id = ?')
+    .prepare(`SELECT ${COLUMNAS_RESTAURANTE} FROM restaurantes WHERE id = ?`)
     .get(id) as FilaRestaurante | undefined
   return fila ? armarLocal(fila) : null
 }
@@ -120,4 +125,14 @@ export function guardarHistorial() {
     if (!local.enVivo || local.mesas.length === 0) continue
     insertar.run(local.id, minuto, local.mesas.length - local.mesasLibres, local.mesas.length)
   }
+}
+
+export type PuntoHistorial = { minuto: string; ocupadas: number; total: number }
+
+// Ocupación de las últimas horas de un local, de más viejo a más nuevo
+export function obtenerHistorial(restauranteId: number, horas: number): PuntoHistorial[] {
+  const desde = new Date(Date.now() - horas * 3600 * 1000).toISOString().slice(0, 16)
+  return db
+    .prepare('SELECT minuto, ocupadas, total FROM historial WHERE restaurante_id = ? AND minuto >= ? ORDER BY minuto')
+    .all(restauranteId, desde) as PuntoHistorial[]
 }

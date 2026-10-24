@@ -7,8 +7,8 @@ export function crearLocalDemo() {
   if (cantidad > 0) return
 
   db.prepare(
-    'INSERT INTO restaurantes (nombre, direccion, lat, lng, email, password_hash) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run('Bar del Evento', 'Rosario, Santa Fe', -32.9476, -60.6305, 'demo@haymesa.com', bcrypt.hashSync('demo1234', 10))
+    'INSERT INTO restaurantes (nombre, tipo, direccion, lat, lng, email, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)'
+  ).run('Bar del Evento', 'Bar', 'Rosario, Santa Fe', -32.9476, -60.6305, 'demo@haymesa.com', bcrypt.hashSync('demo1234', 10))
 
   console.log('Local de demo creado: demo@haymesa.com / demo1234')
 }
