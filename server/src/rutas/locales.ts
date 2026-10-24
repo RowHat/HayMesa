@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requiereAuth } from '../auth.js'
 import { guardarMesas, listarLocales, obtenerLocal, type MesaNueva } from '../locales.js'
+import { avisarLocalActualizado } from '../tiempoReal.js'
 
 export const rutasLocales = Router()
 
@@ -36,5 +37,6 @@ rutasLocales.put('/mi-local/mesas', requiereAuth, (req, res) => {
   }
 
   guardarMesas(res.locals.restauranteId, mesas as MesaNueva[])
+  avisarLocalActualizado(res.locals.restauranteId)
   res.json(obtenerLocal(res.locals.restauranteId))
 })

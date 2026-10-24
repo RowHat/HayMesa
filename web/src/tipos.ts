@@ -1,0 +1,24 @@
+// Mismas formas que devuelve el server
+
+// Zona de la mesa sobre la imagen, en proporciones de 0 a 1
+export type Zona = { x: number; y: number; ancho: number; alto: number }
+
+export type Mesa = {
+  id: number
+  nombre: string
+  capacidad: number
+  zona: Zona
+  ocupada: boolean
+  personas: number
+}
+
+export type Local = {
+  id: number
+  nombre: string
+  direccion: string
+  lat: number
+  lng: number
+  enVivo: boolean
+  mesasLibres: number
+  mesas: Mesa[]
+}

@@ -1,8 +1,17 @@
+import { BrowserRouter, Route, Routes } from 'react-router-dom'
+import Inicio from './paginas/Inicio'
+import Ingresar from './paginas/Ingresar'
+import Panel from './paginas/Panel'
+
 function App() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-emerald-50">
-      <h1 className="text-4xl font-bold text-emerald-700">HayMesa</h1>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Inicio />} />
+        <Route path="/dueno" element={<Ingresar />} />
+        <Route path="/dueno/panel" element={<Panel />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
