@@ -12,9 +12,10 @@ import type { PuntoHistorial } from '../tipos'
 
 const HORAS_HISTORIAL = 3
 
-function useHistorial(id: number) {
+function useHistorial(id: number | undefined) {
   const [puntos, setPuntos] = useState<PuntoHistorial[]>([])
   useEffect(() => {
+    if (id === undefined) return
     const cargar = () => pedir<PuntoHistorial[]>(`/locales/${id}/historial?horas=${HORAS_HISTORIAL}`).then(setPuntos).catch(() => {})
     cargar()
     const intervalo = setInterval(cargar, 60_000) // el server guarda un punto por minuto
@@ -28,9 +29,9 @@ function horaLocal(minutoUtc: string) {
 }
 
 export default function DetalleLocal() {
-  const id = Number(useParams<{ id: string }>().id)
-  const { local, error } = useLocal(id)
-  const historial = useHistorial(id)
+  const slug = decodeURIComponent(useParams<{ slug: string }>().slug)
+  const { local, error } = useLocal(slug)
+  const historial = useHistorial(local?.id)
   const ahora = useAhora()
 
   if (error) {

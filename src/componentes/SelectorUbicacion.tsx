@@ -2,27 +2,11 @@ import { divIcon, type LatLngExpression, type Marker as MarcadorLeaflet } from '
 import 'leaflet/dist/leaflet.css'
 import { useEffect, useState, type KeyboardEvent } from 'react'
 import { MapContainer, Marker, TileLayer, useMap, useMapEvents } from 'react-leaflet'
+import { buscarEnNominatim, type Resultado } from '../direcciones'
 import type { Ubicacion } from '../disponibilidad'
 
 const ROSARIO: [number, number] = [-32.947, -60.642]
-// Gran Rosario, para que la búsqueda priorice resultados de la zona
-const ZONA_ROSARIO = '-60.95,-32.80,-60.55,-33.10'
-
 const pin = divIcon({ className: '', html: '<div class="pin-registro"></div>', iconSize: [28, 28], iconAnchor: [14, 34] })
-
-type Resultado = { lat: string; lon: string; display_name: string }
-
-// Nominatim (OpenStreetMap). Sus reglas piden no buscar en cada tecla: buscamos al confirmar.
-async function buscarEnNominatim(texto: string): Promise<Resultado[]> {
-  const buscar = async (extra: Record<string, string>) => {
-    const parametros = new URLSearchParams({ q: texto, format: 'jsonv2', limit: '5', countrycodes: 'ar', 'accept-language': 'es', ...extra })
-    const respuesta = await fetch(`https://nominatim.openstreetmap.org/search?${parametros}`)
-    if (!respuesta.ok) throw new Error('El buscador de direcciones no respondió')
-    return (await respuesta.json()) as Resultado[]
-  }
-  const enRosario = await buscar({ viewbox: ZONA_ROSARIO, bounded: '1' })
-  return enRosario.length > 0 ? enRosario : buscar({})
-}
 
 // Click en el mapa → marca la ubicación
 function AlHacerClick({ alCambiar }: { alCambiar: (u: Ubicacion) => void }) {

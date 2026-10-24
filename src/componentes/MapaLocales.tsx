@@ -2,7 +2,7 @@ import { maplibreGL } from '@maplibre/maplibre-gl-leaflet'
 import { divIcon } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { CircleMarker, MapContainer, Marker, Popup, useMap } from 'react-leaflet'
 import Link from 'next/link'
 import { colorMarcador, nivelDe, promoVigente, tiempoRestante, type Ubicacion } from '../disponibilidad'
@@ -41,6 +41,17 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
 
   return null
 }
+
+// Vuela a un punto (el botón "mi ubicación"). Va después de <Encuadrar> para ganarle
+function Volar({ destino }: { destino: { lat: number; lng: number; vez: number } | null }) {
+  const mapa = useMap()
+  useEffect(() => {
+    if (destino) mapa.flyTo([destino.lat, destino.lng], 16)
+  }, [mapa, destino])
+  return null
+}
+
+const pinLugar = divIcon({ className: '', html: '<div class="pin-registro"></div>', iconSize: [28, 28], iconAnchor: [14, 34] })
 
 const ICONO_TIPO: Record<string, string> = {
   Restaurante: '🍽️',
@@ -85,6 +96,9 @@ type Props = {
   ubicacion: Ubicacion | null
   sugeridos: number[]
   ahora: number
+  // Dirección que buscó el usuario (se marca con un pin)
+  lugar?: (Ubicacion & { nombre: string }) | null
+  alUbicar?: (u: Ubicacion) => void
   className?: string
 }
 
@@ -111,17 +125,72 @@ function Referencias() {
   )
 }
 
-export default function MapaLocales({ locales: todos, personas, ubicacion, sugeridos, ahora, className = '' }: Props) {
+function BotonMiUbicacion({ alUbicar }: { alUbicar: (u: Ubicacion) => void }) {
+  const [buscando, setBuscando] = useState(false)
+  const [aviso, setAviso] = useState('')
+
+  function ubicar() {
+    setBuscando(true)
+    setAviso('')
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        alUbicar({ lat: pos.coords.latitude, lng: pos.coords.longitude })
+        setBuscando(false)
+      },
+      () => {
+        setAviso('No pudimos obtener tu ubicación')
+        setBuscando(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 },
+    )
+  }
+
+  return (
+    <div className="absolute top-3 right-3 z-[1000] flex flex-col items-end gap-1">
+      <button
+        onClick={ubicar}
+        disabled={buscando}
+        title="Ir a donde estoy"
+        aria-label="Ir a donde estoy"
+        className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-sky-600 shadow-md hover:bg-sky-50 disabled:opacity-60"
+      >
+        <svg viewBox="0 0 24 24" className={`h-6 w-6 ${buscando ? 'animate-pulse' : ''}`} fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="4" fill="currentColor" />
+          <circle cx="12" cy="12" r="8" />
+          <path d="M12 1v3M12 20v3M1 12h3M20 12h3" strokeLinecap="round" />
+        </svg>
+      </button>
+      {aviso && <p className="rounded-lg bg-white/95 px-2 py-1 text-xs text-red-600 shadow">{aviso}</p>}
+    </div>
+  )
+}
+
+export default function MapaLocales({ locales: todos, personas, ubicacion, sugeridos, ahora, lugar = null, alUbicar, className = '' }: Props) {
+  const [volarA, setVolarA] = useState<{ lat: number; lng: number; vez: number } | null>(null)
+
+  function irAMiUbicacion(u: Ubicacion) {
+    alUbicar?.(u)
+    setVolarA((anterior) => ({ ...u, vez: (anterior?.vez ?? 0) + 1 }))
+  }
+
   // En el mapa solo van los locales con la cámara en vivo
   const locales = todos.filter((l) => nivelDe(l) !== 'sin-datos')
   const puntos: [number, number][] = locales.map((l) => [l.lat, l.lng])
   if (ubicacion) puntos.push([ubicacion.lat, ubicacion.lng])
+  if (lugar) puntos.push([lugar.lat, lugar.lng])
 
   return (
     <div className={`relative ${className}`}>
       <MapContainer center={CENTRO_INICIAL} zoom={13} scrollWheelZoom={false} className="z-0 h-full w-full">
         <MapaBase />
         <Encuadrar puntos={puntos} />
+        <Volar destino={volarA} />
+
+        {lugar && (
+          <Marker position={[lugar.lat, lugar.lng]} icon={pinLugar} zIndexOffset={-1000}>
+            <Popup>{lugar.nombre}</Popup>
+          </Marker>
+        )}
 
         {ubicacion && (
           <CircleMarker
@@ -151,12 +220,13 @@ export default function MapaLocales({ locales: todos, personas, ubicacion, suger
                     🔥 {promo.descripcion} · quedan {tiempoRestante(promo.venceEn, ahora)}
                   </p>
                 )}
-                <Link href={`/local/${local.id}`}>Ver mesas →</Link>
+                <Link href={`/local/${local.slug}`}>Ver mesas →</Link>
               </Popup>
             </Marker>
           )
         })}
       </MapContainer>
+      <BotonMiUbicacion alUbicar={irAMiUbicacion} />
       <Referencias />
     </div>
   )
