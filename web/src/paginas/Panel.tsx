@@ -29,6 +29,17 @@ function zonaDesdePuntos(a: Punto, b: Punto): Zona {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), ancho: Math.abs(a.x - b.x), alto: Math.abs(a.y - b.y) }
 }
 
+function mesasGuardadas(mesas: MesaBorrador[]) {
+  return mesas.filter((m): m is MesaBorrador & { id: number } => m.id !== undefined)
+}
+
+// Manda al server solo el estado de cada mesa, nunca la imagen
+function enviarEstado(estados: Map<number, EstadoDetectado>) {
+  const token = leerToken()
+  const mesasEstado = [...estados].map(([mesaId, e]) => ({ mesaId, ocupada: e.ocupada, personas: e.personas }))
+  if (token && mesasEstado.length > 0) socket.emit('estado', { token, mesas: mesasEstado })
+}
+
 function entre0y1(n: number) {
   return Math.min(1, Math.max(0, n))
 }
@@ -163,8 +174,7 @@ export default function Panel() {
           .filter((p) => p.class === 'person' && p.score >= CONFIANZA_MINIMA)
           .map((p) => ({ x: p.bbox[0] / ancho, y: p.bbox[1] / alto, ancho: p.bbox[2] / ancho, alto: p.bbox[3] / alto }))
 
-        const guardadas = mesasRef.current.filter((m): m is MesaBorrador & { id: number } => m.id !== undefined)
-        const conteo = contarPersonasPorMesa(personas, guardadas)
+        const conteo = contarPersonasPorMesa(personas, mesasGuardadas(mesasRef.current))
 
         const nuevos = new Map<number, EstadoDetectado>()
         for (const [id, personasEnMesa] of conteo) {
@@ -189,13 +199,9 @@ export default function Panel() {
     }
   }, [modelo, camaraLista])
 
-  // Envío al server: solo el estado de cada mesa, nunca la imagen
+  // Envío periódico al server
   useEffect(() => {
-    const intervalo = setInterval(() => {
-      const token = leerToken()
-      const mesasEstado = [...estadosRef.current].map(([mesaId, e]) => ({ mesaId, ocupada: e.ocupada, personas: e.personas }))
-      if (token && mesasEstado.length > 0) socket.emit('estado', { token, mesas: mesasEstado })
-    }, MS_ENTRE_ENVIOS)
+    const intervalo = setInterval(() => enviarEstado(estadosRef.current), MS_ENTRE_ENVIOS)
     return () => clearInterval(intervalo)
   }, [])
 
@@ -325,11 +331,24 @@ export default function Panel() {
     setError('')
     try {
       const actualizado = await pedir<Local>('/mi-local/mesas', 'PUT', {
-        mesas: mesas.map(({ nombre, capacidad, zona }) => ({ nombre, capacidad, zona })),
+        mesas: mesas.map(({ id, nombre, capacidad, zona }) => ({ id, nombre, capacidad, zona })),
       })
+      const nuevas = aBorrador(actualizado)
+      mesasRef.current = nuevas // para que el loop de detección use ya las mesas nuevas
       setLocal(actualizado)
-      setMesas(aBorrador(actualizado))
+      setMesas(nuevas)
       setHayCambios(false)
+
+      // Estado de las mesas nuevas ya mismo, con las personas de la última lectura (sin esperar
+      // al próximo ciclo). Las que ya existían mantienen su estado suavizado.
+      const conteo = contarPersonasPorMesa(personasRef.current, mesasGuardadas(nuevas))
+      const nuevos = new Map<number, EstadoDetectado>()
+      for (const [id, personas] of conteo) {
+        nuevos.set(id, estadosRef.current.get(id) ?? { ocupada: personas > 0, personas })
+      }
+      estadosRef.current = nuevos
+      setEstados(nuevos)
+      if (modelo && camaraLista) enviarEstado(nuevos)
     } catch (err) {
       setError((err as Error).message)
     } finally {

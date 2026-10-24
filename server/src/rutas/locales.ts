@@ -53,6 +53,10 @@ rutasLocales.put('/mi-local/mesas', requiereAuth, (req, res) => {
   }
 
   for (const mesa of mesas) {
+    if (mesa.id !== undefined && !Number.isInteger(mesa.id)) {
+      res.status(400).json({ error: 'El id de una mesa tiene que ser un entero' })
+      return
+    }
     if (!mesa.nombre || !Number.isInteger(mesa.capacidad) || mesa.capacidad < 1 || !esZonaValida(mesa.zona)) {
       res.status(400).json({ error: 'Cada mesa necesita nombre, capacidad (entero ≥ 1) y zona con valores entre 0 y 1' })
       return
@@ -60,6 +64,7 @@ rutasLocales.put('/mi-local/mesas', requiereAuth, (req, res) => {
   }
 
   guardarMesas(res.locals.restauranteId, mesas as MesaNueva[])
+  // Avisamos ya con el nuevo total, sin esperar al próximo estado de la cámara
   avisarLocalActualizado(res.locals.restauranteId)
   res.json(obtenerLocal(res.locals.restauranteId))
 })

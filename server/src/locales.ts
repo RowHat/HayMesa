@@ -21,7 +21,9 @@ export type Local = {
   lat: number
   lng: number
   enVivo: boolean
+  mesasTotales: number
   mesasLibres: number
+  mesasOcupadas: number
   mesas: Mesa[]
   promo: Promo | null
 }
@@ -83,7 +85,9 @@ function armarLocal(fila: FilaRestaurante): Local {
     lat: fila.lat,
     lng: fila.lng,
     enVivo,
+    mesasTotales: mesas.length,
     mesasLibres,
+    mesasOcupadas: mesas.length - mesasLibres,
     mesas,
     promo: promo && mesasConPromo > 0 ? { descripcion: promo.descripcion, venceEn: promo.venceEn, mesasConPromo } : null,
   }
@@ -105,14 +109,28 @@ export function obtenerLocal(id: number): Local | null {
   return fila ? armarLocal(fila) : null
 }
 
-export type MesaNueva = { nombre: string; capacidad: number; zona: Zona }
+// "id" viene en las mesas que ya estaban guardadas
+export type MesaNueva = { id?: number; nombre: string; capacidad: number; zona: Zona }
 
-// Reemplaza todas las mesas del local por las nuevas (el dueño las redibuja juntas)
+// Deja el local con exactamente estas mesas. Las que ya existían se actualizan y conservan su
+// estado de la cámara (si alguien está sentado sigue ocupada); las nuevas arrancan libres.
 export const guardarMesas = db.transaction((restauranteId: number, mesas: MesaNueva[]) => {
-  db.prepare('DELETE FROM mesas WHERE restaurante_id = ?').run(restauranteId)
+  const existentes = new Set(
+    (db.prepare('SELECT id FROM mesas WHERE restaurante_id = ?').all(restauranteId) as { id: number }[]).map((m) => m.id)
+  )
+  const quedan = new Set(mesas.map((m) => m.id).filter((id) => id !== undefined && existentes.has(id)))
+
+  const borrar = db.prepare('DELETE FROM mesas WHERE id = ? AND restaurante_id = ?')
+  for (const id of existentes) if (!quedan.has(id)) borrar.run(id, restauranteId)
+
+  const actualizar = db.prepare('UPDATE mesas SET nombre = ?, capacidad = ?, zona = ? WHERE id = ? AND restaurante_id = ?')
   const insertar = db.prepare('INSERT INTO mesas (restaurante_id, nombre, capacidad, zona) VALUES (?, ?, ?, ?)')
   for (const mesa of mesas) {
-    insertar.run(restauranteId, mesa.nombre, mesa.capacidad, JSON.stringify(mesa.zona))
+    if (mesa.id !== undefined && quedan.has(mesa.id)) {
+      actualizar.run(mesa.nombre, mesa.capacidad, JSON.stringify(mesa.zona), mesa.id, restauranteId)
+    } else {
+      insertar.run(restauranteId, mesa.nombre, mesa.capacidad, JSON.stringify(mesa.zona))
+    }
   }
 })
 
