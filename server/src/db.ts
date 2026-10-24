@@ -22,6 +22,21 @@ db.exec(`
     nombre TEXT NOT NULL,
     capacidad INTEGER NOT NULL,
     zona TEXT NOT NULL,
-    ocupada INTEGER NOT NULL DEFAULT 0
+    ocupada INTEGER NOT NULL DEFAULT 0,
+    personas INTEGER NOT NULL DEFAULT 0
+  );
+
+  CREATE TABLE IF NOT EXISTS historial (
+    restaurante_id INTEGER NOT NULL REFERENCES restaurantes(id) ON DELETE CASCADE,
+    minuto TEXT NOT NULL,
+    ocupadas INTEGER NOT NULL,
+    total INTEGER NOT NULL,
+    PRIMARY KEY (restaurante_id, minuto)
   );
 `)
+
+// Bases creadas antes de agregar la columna "personas"
+const columnasMesas = db.prepare('PRAGMA table_info(mesas)').all() as { name: string }[]
+if (!columnasMesas.some((c) => c.name === 'personas')) {
+  db.exec('ALTER TABLE mesas ADD COLUMN personas INTEGER NOT NULL DEFAULT 0')
+}

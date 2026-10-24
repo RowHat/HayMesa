@@ -2,8 +2,11 @@ import 'dotenv/config'
 import express from 'express'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
+import { guardarHistorial } from './locales.js'
 import { rutasAuth } from './rutas/auth.js'
 import { rutasLocales } from './rutas/locales.js'
+import { crearLocalDemo } from './semilla.js'
+import { iniciarTiempoReal } from './tiempoReal.js'
 
 const app = express()
 app.use(express.json())
@@ -18,9 +21,9 @@ app.get('/api/salud', (_req, res) => {
 app.use('/api', rutasAuth)
 app.use('/api', rutasLocales)
 
-io.on('connection', (socket) => {
-  console.log('Socket conectado:', socket.id)
-})
+iniciarTiempoReal(io)
+crearLocalDemo()
+setInterval(guardarHistorial, 60_000)
 
 const puerto = Number(process.env.PORT) || 3001
 servidorHttp.listen(puerto, () => {

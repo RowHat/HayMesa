@@ -9,6 +9,7 @@ export type Mesa = {
   capacidad: number
   zona: Zona
   ocupada: boolean
+  personas: number
 }
 
 export type Local = {
@@ -40,11 +41,12 @@ type FilaMesa = {
   capacidad: number
   zona: string
   ocupada: number
+  personas: number
 }
 
 function armarLocal(fila: FilaRestaurante): Local {
   const filasMesas = db
-    .prepare('SELECT id, nombre, capacidad, zona, ocupada FROM mesas WHERE restaurante_id = ? ORDER BY id')
+    .prepare('SELECT id, nombre, capacidad, zona, ocupada, personas FROM mesas WHERE restaurante_id = ? ORDER BY id')
     .all(fila.id) as FilaMesa[]
 
   const mesas = filasMesas.map((m) => ({
@@ -53,6 +55,7 @@ function armarLocal(fila: FilaRestaurante): Local {
     capacidad: m.capacidad,
     zona: JSON.parse(m.zona) as Zona,
     ocupada: m.ocupada === 1,
+    personas: m.personas,
   }))
 
   const enVivo =
@@ -95,3 +98,26 @@ export const guardarMesas = db.transaction((restauranteId: number, mesas: MesaNu
     insertar.run(restauranteId, mesa.nombre, mesa.capacidad, JSON.stringify(mesa.zona))
   }
 })
+
+export type EstadoMesa = { mesaId: number; ocupada: boolean; personas: number }
+
+// Guarda lo que detectó la cámara. Solo toca mesas que sean de ese local.
+export const guardarEstado = db.transaction((restauranteId: number, estados: EstadoMesa[]) => {
+  const actualizar = db.prepare('UPDATE mesas SET ocupada = ?, personas = ? WHERE id = ? AND restaurante_id = ?')
+  for (const estado of estados) {
+    actualizar.run(estado.ocupada ? 1 : 0, estado.personas, estado.mesaId, restauranteId)
+  }
+  db.prepare('UPDATE restaurantes SET ultima_actualizacion = ? WHERE id = ?').run(new Date().toISOString(), restauranteId)
+})
+
+// Snapshot de ocupación de cada local en vivo, una fila por minuto (para la predicción)
+export function guardarHistorial() {
+  const minuto = new Date().toISOString().slice(0, 16) // "2026-10-24T13:05"
+  const insertar = db.prepare(
+    'INSERT OR IGNORE INTO historial (restaurante_id, minuto, ocupadas, total) VALUES (?, ?, ?, ?)'
+  )
+  for (const local of listarLocales()) {
+    if (!local.enVivo || local.mesas.length === 0) continue
+    insertar.run(local.id, minuto, local.mesas.length - local.mesasLibres, local.mesas.length)
+  }
+}
