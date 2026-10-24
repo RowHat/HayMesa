@@ -20,7 +20,9 @@ export type Local = {
   lat: number
   lng: number
   enVivo: boolean
+  mesasTotales: number
   mesasLibres: number
+  mesasOcupadas: number
   mesas: Mesa[]
   promo: Promo | null
 }

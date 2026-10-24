@@ -21,7 +21,9 @@ export type Local = {
   lat: number
   lng: number
   enVivo: boolean
+  mesasTotales: number
   mesasLibres: number
+  mesasOcupadas: number
   mesas: Mesa[]
   promo: Promo | null
 }
@@ -77,7 +79,9 @@ function armarLocal(fila: FilaRestaurante, promo: PromoActiva | undefined): Loca
     lat: fila.lat,
     lng: fila.lng,
     enVivo,
+    mesasTotales: mesas.length,
     mesasLibres,
+    mesasOcupadas: mesas.length - mesasLibres,
     mesas,
     promo: promo && mesasConPromo > 0 ? { descripcion: promo.descripcion, venceEn: promo.venceEn, mesasConPromo } : null,
   }
@@ -94,14 +98,27 @@ export async function obtenerLocal(id: number): Promise<Local | null> {
   return filas[0] ? armarLocal(filas[0], promos.get(id)) : null
 }
 
-export type MesaNueva = { nombre: string; capacidad: number; zona: Zona }
+// "id" viene en las mesas que ya estaban guardadas
+export type MesaNueva = { id?: number; nombre: string; capacidad: number; zona: Zona }
 
-// Reemplaza todas las mesas del local por las nuevas (el dueño las redibuja juntas)
+// Deja el local con exactamente estas mesas. Las que ya existían se actualizan y conservan su
+// estado de la cámara (si alguien está sentado sigue ocupada); las nuevas arrancan libres.
 export async function guardarMesas(restauranteId: number, mesas: MesaNueva[]) {
   await sql().begin(async (tx) => {
-    await tx`DELETE FROM mesas WHERE restaurante_id = ${restauranteId}`
+    const filas = await tx<{ id: number }[]>`SELECT id FROM mesas WHERE restaurante_id = ${restauranteId} FOR UPDATE`
+    const existentes = new Set(filas.map((m) => m.id))
+    const quedan = new Set(mesas.map((m) => m.id).filter((id): id is number => id !== undefined && existentes.has(id)))
+
+    for (const id of existentes) {
+      if (!quedan.has(id)) await tx`DELETE FROM mesas WHERE id = ${id} AND restaurante_id = ${restauranteId}`
+    }
     for (const m of mesas) {
-      await tx`INSERT INTO mesas (restaurante_id, nombre, capacidad, zona) VALUES (${restauranteId}, ${m.nombre}, ${m.capacidad}, ${tx.json(m.zona)})`
+      if (m.id !== undefined && quedan.has(m.id)) {
+        await tx`UPDATE mesas SET nombre = ${m.nombre}, capacidad = ${m.capacidad}, zona = ${tx.json(m.zona)}
+                 WHERE id = ${m.id} AND restaurante_id = ${restauranteId}`
+      } else {
+        await tx`INSERT INTO mesas (restaurante_id, nombre, capacidad, zona) VALUES (${restauranteId}, ${m.nombre}, ${m.capacidad}, ${tx.json(m.zona)})`
+      }
     }
   })
 }
