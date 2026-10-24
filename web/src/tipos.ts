@@ -26,3 +26,13 @@ export type Local = {
 
 // Un punto por minuto mientras la cámara del local estuvo en vivo ("minuto" en UTC)
 export type PuntoHistorial = { minuto: string; ocupadas: number; total: number }
+
+export type Prediccion =
+  | { suficientesDatos: false; diasConDatos: number }
+  | {
+      suficientesDatos: true
+      diasConDatos: number
+      // ocupación de 0 a 1, o null si no hay datos de esa hora
+      proximasHoras: { hora: string; ocupacion: number | null }[]
+      seLiberaA: string | null
+    }

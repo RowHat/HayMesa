@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requiereAuth } from '../auth.js'
 import { guardarMesas, listarLocales, obtenerHistorial, obtenerLocal, type MesaNueva } from '../locales.js'
+import { predecir } from '../prediccion.js'
 import { avisarLocalActualizado } from '../tiempoReal.js'
 
 export const rutasLocales = Router()
@@ -24,6 +25,11 @@ rutasLocales.get('/locales/:id', (req, res) => {
 rutasLocales.get('/locales/:id/historial', (req, res) => {
   const horas = Math.min(24, Math.max(1, Number(req.query.horas) || 3))
   res.json(obtenerHistorial(Number(req.params.id), horas))
+})
+
+// Público: ocupación esperada según el historial de ese día y hora
+rutasLocales.get('/locales/:id/prediccion', (req, res) => {
+  res.json(predecir(Number(req.params.id)))
 })
 
 // Dueño: su propio local

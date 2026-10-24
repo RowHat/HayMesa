@@ -3,6 +3,7 @@ import express from 'express'
 import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 import { guardarHistorial } from './locales.js'
+import { rutasAsistente } from './rutas/asistente.js'
 import { rutasAuth } from './rutas/auth.js'
 import { rutasLocales } from './rutas/locales.js'
 import { crearLocalDemo } from './semilla.js'
@@ -20,6 +21,7 @@ app.get('/api/salud', (_req, res) => {
 
 app.use('/api', rutasAuth)
 app.use('/api', rutasLocales)
+app.use('/api', rutasAsistente)
 
 iniciarTiempoReal(io)
 crearLocalDemo()

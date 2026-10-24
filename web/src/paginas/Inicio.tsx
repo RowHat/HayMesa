@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import Asistente from '../componentes/Asistente'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
 import MapaLocales from '../componentes/MapaLocales'
 import TarjetaLocal from '../componentes/TarjetaLocal'
@@ -14,8 +15,9 @@ export default function Inicio() {
   const [ubicacion, setUbicacion] = useState<Ubicacion | null>(null)
   const [buscandoUbicacion, setBuscandoUbicacion] = useState(false)
   const [errorUbicacion, setErrorUbicacion] = useState('')
+  const [sugeridos, setSugeridos] = useState<number[]>([])
 
-  // La ubicación queda solo en este navegador: se usa para calcular distancias acá
+  // La ubicación se usa en este navegador para calcular distancias (y en las preguntas al asistente)
   function usarMiUbicacion() {
     setBuscandoUbicacion(true)
     setErrorUbicacion('')
@@ -32,15 +34,17 @@ export default function Inicio() {
     )
   }
 
-  // Primero los que tienen lugar para el grupo, después los llenos y al final los sin datos
+  // Primero los sugeridos por el asistente, después los que tienen lugar para el grupo,
+  // después los llenos y al final los sin datos
   const filas = locales
     .map((local) => ({
       local,
       disponible: tieneMesaPara(local, personas),
       distancia: ubicacion ? distanciaMetros(ubicacion, local) : null,
       grupo: tieneMesaPara(local, personas) ? 0 : local.enVivo ? 1 : 2,
+      sugerido: sugeridos.includes(local.id),
     }))
-    .sort((a, b) => a.grupo - b.grupo || (a.distancia ?? 0) - (b.distancia ?? 0) || a.local.nombre.localeCompare(b.local.nombre))
+    .sort((a, b) => Number(b.sugerido) - Number(a.sugerido) || a.grupo - b.grupo || (a.distancia ?? 0) - (b.distancia ?? 0) || a.local.nombre.localeCompare(b.local.nombre))
 
   const cantidadDisponibles = filas.filter((f) => f.disponible).length
 
@@ -75,12 +79,13 @@ export default function Inicio() {
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-7xl gap-4 px-4 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <main className="mx-auto grid max-w-7xl gap-4 px-4 pt-4 pb-24 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <section className="lg:sticky lg:top-32 lg:order-2 lg:self-start">
           <MapaLocales
             locales={locales}
             personas={personas}
             ubicacion={ubicacion}
+            sugeridos={sugeridos}
             className="h-60 w-full overflow-hidden rounded-2xl shadow-sm sm:h-80 lg:h-[calc(100vh-10rem)]"
           />
         </section>
@@ -101,7 +106,19 @@ export default function Inicio() {
             </button>
           </div>
           {errorUbicacion && <p className="mb-3 text-sm text-red-600">{errorUbicacion}</p>}
-          {ubicacion && <p className="mb-3 text-xs text-slate-500">Tu ubicación no se envía a ningún servidor.</p>}
+          {ubicacion && (
+            <p className="mb-3 text-xs text-slate-500">
+              Tu ubicación no se guarda: se usa para calcular distancias y, si le preguntás al asistente, solo para esa respuesta.
+            </p>
+          )}
+          {sugeridos.length > 0 && (
+            <p className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-sky-50 px-3 py-2 text-sm text-sky-800">
+              ✨ Arriba, los locales que te sugirió el asistente
+              <button onClick={() => setSugeridos([])} className="font-medium underline">
+                Quitar
+              </button>
+            </p>
+          )}
 
           {error && <p className="rounded-xl bg-red-50 p-4 text-sm text-red-700">No pudimos cargar los locales: {error}</p>}
           {cargando && <p className="p-4 text-slate-500">Cargando locales…</p>}
@@ -110,7 +127,13 @@ export default function Inicio() {
           <ul className="space-y-3">
             {filas.map((f) => (
               <li key={f.local.id}>
-                <TarjetaLocal local={f.local} disponible={f.disponible} personas={personas} distancia={f.distancia} />
+                <TarjetaLocal
+                  local={f.local}
+                  disponible={f.disponible}
+                  personas={personas}
+                  distancia={f.distancia}
+                  sugerido={f.sugerido}
+                />
               </li>
             ))}
           </ul>
@@ -123,6 +146,8 @@ export default function Inicio() {
           </p>
         </section>
       </main>
+
+      <Asistente ubicacion={ubicacion} alSugerir={setSugeridos} />
     </div>
   )
 }

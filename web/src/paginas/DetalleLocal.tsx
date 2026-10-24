@@ -4,6 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { pedir } from '../api'
 import IndicadorEnVivo from '../componentes/IndicadorEnVivo'
 import NumeroAnimado from '../componentes/NumeroAnimado'
+import PrediccionLocal from '../componentes/PrediccionLocal'
 import { CLASE_NIVEL, ETIQUETA_NIVEL, nivelDe } from '../disponibilidad'
 import { useLocal } from '../enVivo'
 import type { PuntoHistorial } from '../tipos'
@@ -102,6 +103,8 @@ export default function DetalleLocal() {
             })}
           </ul>
         </section>
+
+        <PrediccionLocal id={local.id} />
 
         <section className="rounded-2xl bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-900">Ocupación de las últimas {HORAS_HISTORIAL} horas</h2>

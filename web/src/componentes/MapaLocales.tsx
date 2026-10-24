@@ -22,9 +22,9 @@ function Encuadrar({ puntos }: { puntos: [number, number][] }) {
   return null
 }
 
-type Props = { locales: Local[]; personas: number; ubicacion: Ubicacion | null; className?: string }
+type Props = { locales: Local[]; personas: number; ubicacion: Ubicacion | null; sugeridos: number[]; className?: string }
 
-export default function MapaLocales({ locales, personas, ubicacion, className = '' }: Props) {
+export default function MapaLocales({ locales, personas, ubicacion, sugeridos, className = '' }: Props) {
   const puntos: [number, number][] = locales.map((l) => [l.lat, l.lng])
   if (ubicacion) puntos.push([ubicacion.lat, ubicacion.lng])
 
@@ -50,8 +50,13 @@ export default function MapaLocales({ locales, personas, ubicacion, className = 
         <CircleMarker
           key={local.id}
           center={[local.lat, local.lng]}
-          radius={13}
-          pathOptions={{ color: '#ffffff', weight: 3, fillColor: colorMarcador(local, personas), fillOpacity: 0.95 }}
+          radius={sugeridos.includes(local.id) ? 18 : 13}
+          pathOptions={{
+            color: sugeridos.includes(local.id) ? '#0284c7' : '#ffffff',
+            weight: sugeridos.includes(local.id) ? 5 : 3,
+            fillColor: colorMarcador(local, personas),
+            fillOpacity: 0.95,
+          }}
         >
           <Popup>
             <p className="font-semibold">{local.nombre}</p>
