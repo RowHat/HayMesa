@@ -1,5 +1,5 @@
 import { promosActivas, registrarMesasTomadas, terminarPromo, type PromoActiva } from './promos'
-import { revisar, sb } from './supabase'
+import { aIso, sql } from './db'
 
 // Zona de la mesa sobre la imagen, en proporciones de 0 a 1
 export type Zona = { x: number; y: number; ancho: number; alto: number }
@@ -39,18 +39,30 @@ type FilaRestaurante = {
   direccion: string
   lat: number
   lng: number
-  ultima_actualizacion: string | null
+  ultima_actualizacion: Date | null
   mesas: Mesa[]
 }
 
-const COLUMNAS = 'id, nombre, tipo, direccion, lat, lng, ultima_actualizacion, mesas(id, nombre, capacidad, zona, ocupada, personas)'
+// Cada local con sus mesas en un JSON, en una sola consulta
+async function leerRestaurantes(id?: number): Promise<FilaRestaurante[]> {
+  return sql()<FilaRestaurante[]>`
+    SELECT r.id, r.nombre, r.tipo, r.direccion, r.lat, r.lng, r.ultima_actualizacion,
+      COALESCE(
+        (SELECT json_agg(json_build_object('id', m.id, 'nombre', m.nombre, 'capacidad', m.capacidad, 'zona', m.zona,
+                                           'ocupada', m.ocupada, 'personas', m.personas) ORDER BY m.id)
+         FROM mesas m WHERE m.restaurante_id = r.id),
+        '[]'::json
+      ) AS mesas
+    FROM restaurantes r
+    ${id === undefined ? sql()`` : sql()`WHERE r.id = ${id}`}
+    ORDER BY r.nombre`
+}
 
 function armarLocal(fila: FilaRestaurante, promo: PromoActiva | undefined): Local {
-  const mesas = [...fila.mesas].sort((a, b) => a.id - b.id)
+  const mesas = fila.mesas
+  const ultima = aIso(fila.ultima_actualizacion)
 
-  const enVivo =
-    fila.ultima_actualizacion !== null &&
-    Date.now() - new Date(fila.ultima_actualizacion).getTime() < SEGUNDOS_EN_VIVO * 1000
+  const enVivo = ultima !== null && Date.now() - new Date(ultima).getTime() < SEGUNDOS_EN_VIVO * 1000
 
   const mesasLibres = mesas.filter((m) => !m.ocupada).length
 
@@ -72,87 +84,71 @@ function armarLocal(fila: FilaRestaurante, promo: PromoActiva | undefined): Loca
 }
 
 export async function listarLocales(): Promise<Local[]> {
-  const [filas, promos] = await Promise.all([
-    sb().from('restaurantes').select(COLUMNAS).order('nombre').then(revisar),
-    promosActivas(),
-  ])
-  return (filas as FilaRestaurante[]).map((f) => armarLocal(f, promos.get(f.id)))
+  const [filas, promos] = await Promise.all([leerRestaurantes(), promosActivas()])
+  return filas.map((f) => armarLocal(f, promos.get(f.id)))
 }
 
 export async function obtenerLocal(id: number): Promise<Local | null> {
   if (!Number.isInteger(id)) return null
-  const [fila, promos] = await Promise.all([
-    sb().from('restaurantes').select(COLUMNAS).eq('id', id).maybeSingle().then(revisar),
-    promosActivas([id]),
-  ])
-  return fila ? armarLocal(fila as FilaRestaurante, promos.get(id)) : null
+  const [filas, promos] = await Promise.all([leerRestaurantes(id), promosActivas([id])])
+  return filas[0] ? armarLocal(filas[0], promos.get(id)) : null
 }
 
 export type MesaNueva = { nombre: string; capacidad: number; zona: Zona }
 
 // Reemplaza todas las mesas del local por las nuevas (el dueño las redibuja juntas)
 export async function guardarMesas(restauranteId: number, mesas: MesaNueva[]) {
-  revisar(await sb().from('mesas').delete().eq('restaurante_id', restauranteId))
-  if (mesas.length === 0) return
-  revisar(
-    await sb()
-      .from('mesas')
-      .insert(mesas.map((m) => ({ restaurante_id: restauranteId, nombre: m.nombre, capacidad: m.capacidad, zona: m.zona }))),
-  )
+  await sql().begin(async (tx) => {
+    await tx`DELETE FROM mesas WHERE restaurante_id = ${restauranteId}`
+    for (const m of mesas) {
+      await tx`INSERT INTO mesas (restaurante_id, nombre, capacidad, zona) VALUES (${restauranteId}, ${m.nombre}, ${m.capacidad}, ${tx.json(m.zona)})`
+    }
+  })
 }
 
 export type EstadoMesa = { mesaId: number; ocupada: boolean; personas: number }
 
 // Guarda lo que detectó la cámara. Solo toca mesas que sean de ese local.
 export async function guardarEstado(restauranteId: number, estados: EstadoMesa[]) {
-  const anteriores = revisar(
-    await sb().from('mesas').select('id, ocupada').eq('restaurante_id', restauranteId),
-  ) as { id: number; ocupada: boolean }[]
-  const ocupadaAntes = new Map(anteriores.map((m) => [m.id, m.ocupada]))
+  const { ocupadas, total, seOcuparon } = await sql().begin(async (tx) => {
+    const anteriores = await tx<{ id: number; ocupada: boolean }[]>`
+      SELECT id, ocupada FROM mesas WHERE restaurante_id = ${restauranteId} FOR UPDATE`
+    const ocupadaAntes = new Map(anteriores.map((m) => [m.id, m.ocupada]))
+    const validos = estados.filter((e) => ocupadaAntes.has(e.mesaId))
+    for (const e of validos) {
+      await tx`UPDATE mesas SET ocupada = ${e.ocupada}, personas = ${e.personas} WHERE id = ${e.mesaId}`
+    }
+    await tx`UPDATE restaurantes SET ultima_actualizacion = now() WHERE id = ${restauranteId}`
 
-  const validos = estados.filter((e) => ocupadaAntes.has(e.mesaId))
-  const mesasQueSeOcuparon = validos.filter((e) => ocupadaAntes.get(e.mesaId) === false && e.ocupada).length
-
-  await Promise.all(
-    validos.map((e) =>
-      sb().from('mesas').update({ ocupada: e.ocupada, personas: e.personas }).eq('id', e.mesaId).eq('restaurante_id', restauranteId).then(revisar),
-    ),
-  )
-  revisar(await sb().from('restaurantes').update({ ultima_actualizacion: new Date().toISOString() }).eq('id', restauranteId))
+    const final = new Map(ocupadaAntes)
+    for (const e of validos) final.set(e.mesaId, e.ocupada)
+    return {
+      ocupadas: [...final.values()].filter(Boolean).length,
+      total: final.size,
+      seOcuparon: validos.filter((e) => ocupadaAntes.get(e.mesaId) === false && e.ocupada).length,
+    }
+  })
 
   // La promo descuenta cupo con cada mesa que se ocupa, y termina si el local se llena
-  if (mesasQueSeOcuparon > 0) await registrarMesasTomadas(restauranteId, mesasQueSeOcuparon)
-  const estadoFinal = new Map(ocupadaAntes)
-  for (const e of validos) estadoFinal.set(e.mesaId, e.ocupada)
-  const ocupadas = [...estadoFinal.values()].filter(Boolean).length
-  if (estadoFinal.size > 0 && ocupadas === estadoFinal.size) await terminarPromo(restauranteId, 'lleno')
+  if (seOcuparon > 0) await registrarMesasTomadas(restauranteId, seOcuparon)
+  if (total > 0 && ocupadas === total) await terminarPromo(restauranteId, 'lleno')
 
   // Una fila por minuto de ocupación (para la predicción)
-  if (estadoFinal.size > 0) {
+  if (total > 0) {
     const minuto = new Date().toISOString().slice(0, 16) // "2026-10-24T13:05"
-    revisar(
-      await sb()
-        .from('historial')
-        .upsert(
-          { restaurante_id: restauranteId, minuto, ocupadas, total: estadoFinal.size },
-          { onConflict: 'restaurante_id,minuto', ignoreDuplicates: true },
-        ),
-    )
+    await sql()`
+      INSERT INTO historial (restaurante_id, minuto, ocupadas, total) VALUES (${restauranteId}, ${minuto}, ${ocupadas}, ${total})
+      ON CONFLICT DO NOTHING`
   }
 }
 
 export type PuntoHistorial = { minuto: string; ocupadas: number; total: number }
 
-// Todas las filas de historial desde una fecha (Supabase devuelve de a 1000)
-export async function leerHistorial(restauranteId: number, desde?: string): Promise<PuntoHistorial[]> {
-  const filas: PuntoHistorial[] = []
-  for (let desdeFila = 0; ; desdeFila += 1000) {
-    let consulta = sb().from('historial').select('minuto, ocupadas, total').eq('restaurante_id', restauranteId)
-    if (desde) consulta = consulta.gte('minuto', desde)
-    const pagina = revisar(await consulta.order('minuto').range(desdeFila, desdeFila + 999)) as PuntoHistorial[]
-    filas.push(...pagina)
-    if (pagina.length < 1000) return filas
-  }
+export async function leerHistorial(restauranteId: number, desde = ''): Promise<PuntoHistorial[]> {
+  return sql()<PuntoHistorial[]>`
+    SELECT minuto, ocupadas, total FROM historial
+    WHERE restaurante_id = ${restauranteId} AND minuto >= ${desde}
+    ORDER BY minuto`
 }
 
 // Ocupación de las últimas horas de un local, de más viejo a más nuevo

@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
 import { crearToken } from '@/servidor/auth'
 import { obtenerLocal } from '@/servidor/locales'
-import { revisar, sb } from '@/servidor/supabase'
+import { sql } from '@/servidor/db'
 
 export async function POST(req: Request) {
   const { nombre, tipo, direccion, lat, lng, email, password } = await req.json().catch(() => ({}))
@@ -16,17 +16,14 @@ export async function POST(req: Request) {
     return Response.json({ error: 'La contraseña debe tener al menos 6 caracteres' }, { status: 400 })
   }
 
-  const existe = revisar(await sb().from('restaurantes').select('id').eq('email', email).maybeSingle())
+  const [existe] = await sql()`SELECT id FROM restaurantes WHERE email = ${String(email)}`
   if (existe) return Response.json({ error: 'Ya hay un local registrado con ese email' }, { status: 409 })
 
   const passwordHash = await bcrypt.hash(String(password), 10)
-  const fila = revisar(
-    await sb()
-      .from('restaurantes')
-      .insert({ nombre, tipo: tipo || 'Restaurante', direccion, lat, lng, email, password_hash: passwordHash })
-      .select('id')
-      .single(),
-  ) as { id: number }
+  const [fila] = await sql()<{ id: number }[]>`
+    INSERT INTO restaurantes (nombre, tipo, direccion, lat, lng, email, password_hash)
+    VALUES (${String(nombre)}, ${String(tipo || 'Restaurante')}, ${String(direccion)}, ${lat}, ${lng}, ${String(email)}, ${passwordHash})
+    RETURNING id`
 
   return Response.json({ token: crearToken(fila.id), local: await obtenerLocal(fila.id) }, { status: 201 })
 }
