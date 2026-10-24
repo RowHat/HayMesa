@@ -14,6 +14,7 @@ export type Mesa = {
 
 export type Local = {
   id: number
+  slug: string
   nombre: string
   tipo: string
   direccion: string

@@ -48,6 +48,34 @@ alter table mesas enable row level security;
 alter table historial enable row level security;
 alter table promos enable row level security;
 
+-- URL linda para cada local: /local/cerveceria-la-fluvial. Se arma sola desde el nombre (y no se repite)
+alter table restaurantes add column if not exists slug text unique;
+
+create or replace function crear_slug() returns trigger language plpgsql as $$
+declare
+  base text;
+  candidato text;
+  n int := 1;
+begin
+  if tg_op = 'UPDATE' and new.slug is not null and new.nombre = old.nombre then return new; end if;
+  base := trim(both '-' from regexp_replace(
+    translate(lower(new.nombre), 'áàäâãéèëêíìïîóòöôõúùüûñç', 'aaaaaeeeeiiiiooooouuuunc'), '[^a-z0-9]+', '-', 'g'));
+  if base = '' then base := 'local'; end if;
+  candidato := base;
+  while exists (select 1 from restaurantes where slug = candidato and id is distinct from new.id) loop
+    n := n + 1;
+    candidato := base || '-' || n;
+  end loop;
+  new.slug := candidato;
+  return new;
+end
+$$;
+
+drop trigger if exists restaurantes_slug on restaurantes;
+create trigger restaurantes_slug before insert or update of nombre on restaurantes
+  for each row execute function crear_slug();
+
+
 -- Local de demo: demo@haymesa.com / demo1234
 insert into restaurantes (nombre, tipo, direccion, lat, lng, email, password_hash)
 values ('Bar del Evento', 'Bar', 'Rosario, Santa Fe', -32.9476, -60.6305, 'demo@haymesa.com',

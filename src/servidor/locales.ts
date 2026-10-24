@@ -15,6 +15,7 @@ export type Mesa = {
 
 export type Local = {
   id: number
+  slug: string
   nombre: string
   tipo: string
   direccion: string
@@ -36,6 +37,7 @@ const SEGUNDOS_EN_VIVO = 60
 
 type FilaRestaurante = {
   id: number
+  slug: string
   nombre: string
   tipo: string
   direccion: string
@@ -45,10 +47,10 @@ type FilaRestaurante = {
   mesas: Mesa[]
 }
 
-// Cada local con sus mesas en un JSON, en una sola consulta
-async function leerRestaurantes(id?: number): Promise<FilaRestaurante[]> {
+// Cada local con sus mesas en un JSON, en una sola consulta (todos, o uno por id o por slug)
+async function leerRestaurantes(clave?: number | string): Promise<FilaRestaurante[]> {
   return sql()<FilaRestaurante[]>`
-    SELECT r.id, r.nombre, r.tipo, r.direccion, r.lat, r.lng, r.ultima_actualizacion,
+    SELECT r.id, r.slug, r.nombre, r.tipo, r.direccion, r.lat, r.lng, r.ultima_actualizacion,
       COALESCE(
         (SELECT json_agg(json_build_object('id', m.id, 'nombre', m.nombre, 'capacidad', m.capacidad, 'zona', m.zona,
                                            'ocupada', m.ocupada, 'personas', m.personas) ORDER BY m.id)
@@ -56,7 +58,7 @@ async function leerRestaurantes(id?: number): Promise<FilaRestaurante[]> {
         '[]'::json
       ) AS mesas
     FROM restaurantes r
-    ${id === undefined ? sql()`` : sql()`WHERE r.id = ${id}`}
+    ${clave === undefined ? sql()`` : typeof clave === 'number' ? sql()`WHERE r.id = ${clave}` : sql()`WHERE r.slug = ${clave}`}
     ORDER BY r.nombre`
 }
 
@@ -73,6 +75,7 @@ function armarLocal(fila: FilaRestaurante, promo: PromoActiva | undefined): Loca
 
   return {
     id: fila.id,
+    slug: fila.slug,
     nombre: fila.nombre,
     tipo: fila.tipo,
     direccion: fila.direccion,
@@ -96,6 +99,13 @@ export async function obtenerLocal(id: number): Promise<Local | null> {
   if (!Number.isInteger(id)) return null
   const [filas, promos] = await Promise.all([leerRestaurantes(id), promosActivas([id])])
   return filas[0] ? armarLocal(filas[0], promos.get(id)) : null
+}
+
+// Para la página del local: /local/cerveceria-la-fluvial (y las direcciones viejas con el id)
+export async function obtenerLocalPorSlug(slug: string): Promise<Local | null> {
+  const [fila] = await leerRestaurantes(slug)
+  if (fila) return armarLocal(fila, (await promosActivas([fila.id])).get(fila.id))
+  return /^\d+$/.test(slug) ? obtenerLocal(Number(slug)) : null
 }
 
 // "id" viene en las mesas que ya estaban guardadas

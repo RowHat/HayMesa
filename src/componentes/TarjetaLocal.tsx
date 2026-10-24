@@ -12,7 +12,7 @@ export default function TarjetaLocal({ local, disponible, personas, distancia, s
 
   return (
     <Link
-      href={`/local/${local.id}`}
+      href={`/local/${local.slug}`}
       className={`flex items-center gap-4 rounded-2xl border bg-white p-4 shadow-sm transition hover:shadow-md ${
         disponible ? (promo ? 'border-pink-300' : 'border-emerald-200') : 'border-slate-200 opacity-60'
       } ${sugerido ? 'ring-4 ring-sky-400/70' : ''}`}

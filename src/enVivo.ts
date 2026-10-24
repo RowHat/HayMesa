@@ -46,20 +46,20 @@ export function useLocales() {
   return { locales, cargando, error }
 }
 
-// Un local, actualizado en vivo
-export function useLocal(id: number) {
+// Un local (por slug o id), actualizado en vivo
+export function useLocal(clave: string) {
   const [local, setLocal] = useState<Local | null>(null)
   const [error, setError] = useState('')
 
   useEffect(() => {
     function cargar() {
-      pedir<Local>(`/locales/${id}`)
+      pedir<Local>(`/locales/${encodeURIComponent(clave)}`)
         .then(setLocal)
         .catch((err) => setError(err.message))
     }
 
     function alActualizar(actualizado: Local) {
-      if (actualizado.id === id) setLocal(actualizado)
+      if (actualizado.slug === clave || String(actualizado.id) === clave) setLocal(actualizado)
     }
 
     cargar()
@@ -71,7 +71,7 @@ export function useLocal(id: number) {
       dejarConexion()
       clearInterval(intervalo)
     }
-  }, [id])
+  }, [clave])
 
   return { local, error }
 }
